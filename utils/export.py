@@ -1,19 +1,32 @@
-
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from textwrap import wrap
 import tempfile
 
-def export_to_pdf(text):
+def export_to_pdf(text, font_size=14):
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     c = canvas.Canvas(temp_file.name, pagesize=A4)
+
     width, height = A4
-    y = height - 50
-    for line in text.split("\n"):
-        c.setFont("Helvetica", 14)
-        c.drawString(50, y, line[:100])
-        y -= 20
-        if y < 50:
-            c.showPage()
-            y = height - 50
+    margin = 50
+    max_line_width = width - 2 * margin
+    line_height = font_size + 6
+    y = height - margin
+
+    c.setFont("Helvetica", font_size)
+
+    for line in text.strip().split('\n'):
+        if not line.strip():
+            y -= line_height
+            continue
+        wrapped_lines = wrap(line.strip(), width=90)
+        for wline in wrapped_lines:
+            c.drawString(margin, y, wline)
+            y -= line_height
+            if y < margin:
+                c.showPage()
+                c.setFont("Helvetica", font_size)
+                y = height - margin
+
     c.save()
     return temp_file.name
