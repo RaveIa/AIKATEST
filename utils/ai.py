@@ -3,8 +3,8 @@ import openai
 
 client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# Appelle GPT-3.5-Turbo pour une tâche donnée
-def call_openai_chat(prompt: str, system_message: str = "Tu es un assistant pédagogique spécialisé pour les élèves dyslexiques.") -> str:
+# Fonction générale pour appeler GPT-3.5
+def call_openai_chat(prompt: str, system_message: str = "Tu es un assistant pédagogique.") -> str:
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo-1106",
@@ -19,7 +19,7 @@ def call_openai_chat(prompt: str, system_message: str = "Tu es un assistant péd
     except Exception as e:
         return f"❌ Erreur OpenAI : {str(e)}"
 
-# Reformulation du texte pour un public dyslexique
+# Reformulation du texte
 def reformulate_text(text: str) -> str:
     if not text.strip():
         return "⚠️ Texte vide."
@@ -30,16 +30,27 @@ def reformulate_text(text: str) -> str:
     )
     return call_openai_chat(prompt)
 
-# Pose une question sur le document (avec contexte RAG)
-def ask_question(question: str, chunks: list[str]) -> str:
+# Détection du thème principal du document
+def detect_topic(text: str) -> str:
+    prompt = (
+        "Voici un extrait de document. Résume en une seule phrase courte et claire le thème principal de ce document :\n\n"
+        f"{text[:1500]}"
+    )
+    return call_openai_chat(prompt, system_message="Tu es un assistant pédagogique.")
+
+# Réponse à une question basée sur le thème
+def ask_question(question: str, chunks: list[str], topic: str) -> str:
     if not question.strip():
         return ""
-    context = "\n\n".join(chunks[:3])  # prend les 3 chunks les plus pertinents déjà triés
+    context = "\n\n".join(chunks[:3])  # 3 chunks les plus pertinents
     prompt = (
-        "Voici un extrait de document :\n\n"
-        f"{context}\n\n"
-        "Tu dois répondre à la question suivante **uniquement** si la réponse est dans le texte ci-dessus.\n"
-        "Si la réponse ne s'y trouve pas, dis : « Je ne peux pas répondre car ce n’est pas dans le document. »\n\n"
-        f"Question : {question}"
+        "Tu es un assistant pédagogique. Le document ci-dessous traite du thème suivant : "
+        f"« {topic} ».\n\n"
+        "Réponds à la question de l'utilisateur de façon claire et accessible, même si la réponse "
+        "ne figure pas dans le texte, tant qu'elle reste dans le thème.\n\n"
+        "Si la question n'a aucun lien avec ce thème, dis simplement : "
+        "« Je ne peux pas répondre car ce n’est pas lié au sujet du document. »\n\n"
+        f"=== Texte extrait ===\n{context}\n\n"
+        f"=== Question ===\n{question}"
     )
     return call_openai_chat(prompt)
