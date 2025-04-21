@@ -7,13 +7,12 @@ headers = {
     "Authorization": f"Bearer {st.secrets['HF_TOKEN']}"
 }
 
-def call_huggingface_api(prompt: str, max_new_tokens: int = 256):
+def call_huggingface_api(prompt: str, max_new_tokens: int = 250):
     payload = {
         "inputs": prompt,
         "parameters": {
             "max_new_tokens": max_new_tokens,
             "temperature": 0.7,
-            # "top_p": 0.9,  # si tu veux plus de contrôle
         }
     }
     response = requests.post(API_URL, headers=headers, json=payload)
@@ -26,22 +25,20 @@ def extract_generated_text(response_json):
     # Gestion d'erreur
     if isinstance(response_json, dict) and response_json.get("error"):
         return f"❌ Erreur HF : {response_json['error']}"
-    # Si on a une liste de dicts
+    # Si liste de dicts
     if isinstance(response_json, list):
         for item in response_json:
-            # Renvoie la première sortie valide
             if "generated_text" in item:
                 return item["generated_text"].strip()
             if "output" in item:
                 return item["output"].strip()
         return "❌ Aucune génération trouvée."
-    # Cas d'un dict simple
+    # Cas dict simple
     if isinstance(response_json, dict) and "generated_text" in response_json:
         return response_json["generated_text"].strip()
     return "❌ Réponse inattendue."
 
 def reformulate_text(text: str) -> str:
-    # Ne pas envoyer de prompts vides
     if not text.strip():
         return "⚠️ Texte original vide, impossible de reformuler."
     prompt = (
@@ -49,7 +46,7 @@ def reformulate_text(text: str) -> str:
         "pour un élève dyslexique. Utilise des phrases courtes et un vocabulaire simple :\n\n"
         f"{text}"
     )
-    result = call_huggingface_api(prompt, max_new_tokens=512)
+    result = call_huggingface_api(prompt, max_new_tokens=250)
     return extract_generated_text(result)
 
 def ask_question(question: str, context: str) -> str:
@@ -65,5 +62,5 @@ def ask_question(question: str, context: str) -> str:
         f"{question}\n\n"
         "=== Fin du contexte ==="
     )
-    result = call_huggingface_api(prompt, max_new_tokens=256)
+    result = call_huggingface_api(prompt, max_new_tokens=150)
     return extract_generated_text(result)
