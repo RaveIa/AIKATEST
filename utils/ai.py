@@ -1,66 +1,45 @@
 import streamlit as st
-import requests
+import openai
 
-# URL du modèle léger et compatible Inference API
-API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
-headers = {
-    "Authorization": f"Bearer {st.secrets['HF_TOKEN']}"
-}
+# Utilise la clé API depuis les secrets Streamlit
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-def call_huggingface_api(prompt: str, max_new_tokens: int = 250):
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": max_new_tokens,
-            "temperature": 0.7,
-        }
-    }
-    response = requests.post(API_URL, headers=headers, json=payload)
+# Fonction générale d'appel à GPT-3.5
+def call_openai_chat(prompt: str, system_message: str = "Tu es un assistant pédagogique spécialisé pour les élèves dyslexiques.") -> str:
     try:
-        return response.json()
-    except requests.exceptions.JSONDecodeError:
-        return {"error": response.text}
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo-1106",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"❌ Erreur OpenAI : {str(e)}"
 
-def extract_generated_text(response_json):
-    # Gestion d'erreur
-    if isinstance(response_json, dict) and response_json.get("error"):
-        return f"❌ Erreur HF : {response_json['error']}"
-    # Si liste de dicts
-    if isinstance(response_json, list):
-        for item in response_json:
-            if "generated_text" in item:
-                return item["generated_text"].strip()
-            if "output" in item:
-                return item["output"].strip()
-        return "❌ Aucune génération trouvée."
-    # Cas dict simple
-    if isinstance(response_json, dict) and "generated_text" in response_json:
-        return response_json["generated_text"].strip()
-    return "❌ Réponse inattendue."
-
+# Reformulation adaptée
 def reformulate_text(text: str) -> str:
     if not text.strip():
-        return "⚠️ Texte original vide, impossible de reformuler."
+        return "⚠️ Texte vide."
     prompt = (
-        "Réécris le texte suivant pour qu'il soit clair et facile à lire "
-        "pour un élève dyslexique. Utilise des phrases courtes et un vocabulaire simple :\n\n"
+        "Réécris ce texte pour qu’il soit plus facile à lire pour un élève dyslexique. "
+        "Utilise des phrases courtes, un vocabulaire simple, et une structure claire :\n\n"
         f"{text}"
     )
-    result = call_huggingface_api(prompt, max_new_tokens=250)
-    return extract_generated_text(result)
+    return call_openai_chat(prompt)
 
+# Réponse à une question, limitée au contexte
 def ask_question(question: str, context: str) -> str:
     if not question.strip():
         return ""
     prompt = (
-        "Tu es un assistant pédagogique. Réponds **uniquement** si la réponse "
-        "se trouve dans le texte ci‑dessous. Sinon, réponds : "
-        "« Je ne peux répondre qu'à des questions sur ce document. »\n\n"
-        "=== Texte de référence ===\n"
+        "Voici un texte :\n\n"
         f"{context}\n\n"
-        "=== Question ===\n"
-        f"{question}\n\n"
-        "=== Fin du contexte ==="
+        "Tu dois répondre à la question suivante **en te basant uniquement sur ce texte**. "
+        "Si tu ne trouves pas la réponse dans le texte, dis : « Je ne peux pas répondre car ce n’est pas dans le document. »\n\n"
+        f"Question : {question}"
     )
-    result = call_huggingface_api(prompt, max_new_tokens=150)
-    return extract_generated_text(result)
+    return call_openai_chat(prompt)
