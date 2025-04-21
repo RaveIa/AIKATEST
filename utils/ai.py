@@ -1,55 +1,45 @@
 import streamlit as st
-from utils.extract import extract_text_from_pdf, extract_text_from_docx
-from utils.export import export_to_pdf
-from utils.tts import text_to_speech
-from utils.rag import build_index, is_question_relevant
-from utils.ai import reformulate_text, ask_question
+import openai
 
-st.set_page_config(page_title="Assistant IA - Dyslexie", layout="wide")
-st.title("🧠 Assistant IA pour élèves dyslexiques")
+client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# Initialiser la session
-if "reformulated_text" not in st.session_state:
-    st.session_state.reformulated_text = ""
-if "rag_chunks" not in st.session_state:
-    st.session_state.rag_chunks = []
-if "rag_embeddings" not in st.session_state:
-    st.session_state.rag_embeddings = []
+# Appelle GPT-3.5-Turbo pour une tâche donnée
+def call_openai_chat(prompt: str, system_message: str = "Tu es un assistant pédagogique spécialisé pour les élèves dyslexiques.") -> str:
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo-1106",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"❌ Erreur OpenAI : {str(e)}"
 
-uploaded_file = st.file_uploader("📂 Charge un fichier PDF ou Word", type=["pdf", "docx"])
+# Reformulation du texte pour un public dyslexique
+def reformulate_text(text: str) -> str:
+    if not text.strip():
+        return "⚠️ Texte vide."
+    prompt = (
+        "Réécris le texte suivant pour qu’il soit facile à lire pour un élève dyslexique. "
+        "Utilise des phrases courtes, un vocabulaire simple, et une structure claire :\n\n"
+        f"{text}"
+    )
+    return call_openai_chat(prompt)
 
-if uploaded_file:
-    # Extraire le texte (interne uniquement)
-    if uploaded_file.type == "application/pdf":
-        raw_text = extract_text_from_pdf(uploaded_file)
-    else:
-        raw_text = extract_text_from_docx(uploaded_file)
-
-    # Indexer le document pour le chat IA
-    if not st.session_state.rag_chunks:
-        _, chunks, embeddings = build_index(raw_text)
-        st.session_state.rag_chunks = chunks
-        st.session_state.rag_embeddings = embeddings
-
-    # Bouton reformulation
-    if st.button("✨ Reformuler pour dyslexie"):
-        with st.spinner("Reformulation en cours..."):
-            st.session_state.reformulated_text = reformulate_text(raw_text)
-
-    # Bouton export PDF si reformulé
-    if st.session_state.reformulated_text:
-        st.success("Texte reformulé avec succès !")
-        if st.button("📄 Télécharger version PDF adaptée"):
-            path = export_to_pdf(st.session_state.reformulated_text)
-            with open(path, "rb") as f:
-                st.download_button("📥 Télécharger", f, file_name="cours_dyslexique.pdf")
-
-    # Chat IA avec le contenu du document
-    st.subheader("💬 Pose une question sur le document")
-    question = st.text_input("Ta question ici")
-    if question:
-        if is_question_relevant(question, st.session_state.rag_embeddings):
-            response = ask_question(question, st.session_state.rag_chunks)
-            st.markdown(f"**Réponse :** {response}")
-        else:
-            st.warning("❌ Cette question ne semble pas liée au contenu du document.")
+# Pose une question sur le document (avec contexte RAG)
+def ask_question(question: str, chunks: list[str]) -> str:
+    if not question.strip():
+        return ""
+    context = "\n\n".join(chunks[:3])  # prend les 3 chunks les plus pertinents déjà triés
+    prompt = (
+        "Voici un extrait de document :\n\n"
+        f"{context}\n\n"
+        "Tu dois répondre à la question suivante **uniquement** si la réponse est dans le texte ci-dessus.\n"
+        "Si la réponse ne s'y trouve pas, dis : « Je ne peux pas répondre car ce n’est pas dans le document. »\n\n"
+        f"Question : {question}"
+    )
+    return call_openai_chat(prompt)
