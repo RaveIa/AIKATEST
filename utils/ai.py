@@ -1,9 +1,10 @@
 
 import requests
 import os
+import streamlit as st
 
 API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
-headers = {"Authorization": f"Bearer {os.getenv('HF_TOKEN', 'hf_your_token_here')}"}
+headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
 
 def reformulate_text(text):
     prompt = f"Réécris ce texte pour qu'il soit plus facile à lire pour un élève dyslexique : {text}"
