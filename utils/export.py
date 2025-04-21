@@ -9,7 +9,7 @@ def export_to_pdf(text, font_size=14):
 
     width, height = A4
     margin = 50
-    max_line_width = width - 2 * margin
+    max_line_chars = 95  # ~ correspond à largeur utile A4
     line_height = font_size + 6
     y = height - margin
 
@@ -19,7 +19,7 @@ def export_to_pdf(text, font_size=14):
         if not line.strip():
             y -= line_height
             continue
-        wrapped_lines = wrap(line.strip(), width=90)
+        wrapped_lines = wrap(line.strip(), width=max_line_chars)
         for wline in wrapped_lines:
             c.drawString(margin, y, wline)
             y -= line_height
