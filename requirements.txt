@@ -1,0 +1,9 @@
+
+streamlit
+python-docx
+PyMuPDF
+transformers
+sentence-transformers
+faiss-cpu
+gTTS
+reportlab
