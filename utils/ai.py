@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-API_URL = "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct"
+API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
 headers = {
     "Authorization": f"Bearer {st.secrets['HF_TOKEN']}"
 }
@@ -23,9 +23,8 @@ def extract_generated_text(response_json):
 
 def reformulate_text(text):
     prompt = (
-        "Simplifie le texte suivant pour qu'il soit clair, facile à lire, et adapté à un élève dyslexique :\n\n"
-        f"{text}\n\n"
-        "Utilise des phrases courtes, un langage simple, et supprime les mots complexes si possible."
+        "Réécris le texte suivant pour qu'il soit clair, simple et facile à lire pour un élève dyslexique :\n\n"
+    f"{text}"
     )
     result = call_huggingface_api(prompt)
     return extract_generated_text(result)
